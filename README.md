@@ -114,3 +114,53 @@ jobs:
       run: echo ${{ steps.sync.outputs.has_new_commits }}
 
 ```
+
+---
+
+## 推荐--Workflows--Sync.yml
+```
+name: RepoSync
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"  # 每周一 0 点运行
+  workflow_dispatch:  # 手动触发工作流
+
+jobs:
+  sync_latest_from_upstream:
+    name: 自动同步上游仓库
+    runs-on: ubuntu-latest
+    if: ${{ github.event.repository.fork }}  # 仅在 fork 仓库中运行
+    env:
+      UPSTREAM_REPO: github-username/repositories-name  # 在这里定义上游仓库，格式为“用户名/仓库名”
+      UPSTREAM_REPO_BRANCH: main  # 定义上游仓库的分支
+      TARGET_REPO_BRANCH: main  # 定义目标仓库的分支
+
+    steps:
+      # 检出当前仓库代码
+      - uses: actions/checkout@v4
+
+      # 同步上游仓库的更改
+      - name: Sync upstream changes
+        id: sync
+        uses: yxdz2020/Fork-Sync-With-Upstream-action@v20250122
+        with:
+          upstream_sync_repo: ${{ env.UPSTREAM_REPO }} # 使用定义的上游仓库
+          upstream_sync_branch: ${{ env.UPSTREAM_REPO_BRANCH }} # 使用定义的上游分支
+          target_sync_branch: ${{ env.TARGET_REPO_BRANCH }} # 使用定义的目标分支
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }} # 自动生成，无需设置
+          test_mode: false # 关闭测试模式，实际执行同步操作
+        continue-on-error: true # 即使同步失败，继续执行后续步骤
+
+      # 输出同步结果
+      - name: 输出同步结果
+        run: |
+          if [ "${{ steps.sync.outputs.changes_pushed }}" = "true" ]; then
+            echo "✅ 同步成功：上游仓库的最新更改已同步到目标仓库。"
+          elif [ "${{ steps.sync.outputs.changes_pushed }}" = "false" ]; then
+            echo "⚠️ 无需同步：没有检测到需要同步的更改。"
+          else
+            echo "❌ 同步失败：${{ steps.sync.outputs.error_message:-同步过程中出现了问题。}}"
+          fi
+```
+---
